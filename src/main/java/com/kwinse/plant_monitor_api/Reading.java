@@ -1,5 +1,6 @@
 package com.kwinse.plant_monitor_api;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -34,6 +35,7 @@ public class Reading {
         this.moisture = moisture;
     }
 
+    @JsonFormat(pattern = "MM-dd-YYYY HH:mm:ss")
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
