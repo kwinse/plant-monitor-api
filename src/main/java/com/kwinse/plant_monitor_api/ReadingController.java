@@ -1,5 +1,6 @@
 package com.kwinse.plant_monitor_api;
 
+import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,20 @@ public class ReadingController {
 
     public ReadingController(ReadingRepository readingRepository) {
         this.readingRepository = readingRepository;
+    }
+
+    @GetMapping("/api/readings/all")
+    public List<Reading> getAllReadings() {
+        return readingRepository.findAll();
+    }
+
+    @GetMapping("/api/readings/latest")
+    public ResponseEntity<Reading> getLatestReading() {
+        Reading latest = readingRepository.findTopByOrderByTimestampDesc();
+        if (latest == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(latest);
     }
 
     @GetMapping("/api/readings/{id}")
@@ -35,7 +50,10 @@ public class ReadingController {
 
     @PostMapping("/api/readings")
     public ResponseEntity<?> receiveReading(@RequestBody Reading reading) {
-        if (reading.getMoisture() < 0 || reading.getMoisture() > 100) {
+        if (reading.getMoisture() == null) {
+            return ResponseEntity.badRequest().body("Missing moisture value.");
+        }
+        else if (reading.getMoisture() < 0 || reading.getMoisture() > 100) {
             return ResponseEntity.badRequest().body("Invalid moisture value.");
         }
         reading.setTimestamp(LocalDateTime.now().withNano(0));

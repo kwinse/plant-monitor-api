@@ -9,4 +9,6 @@ public interface ReadingRepository extends JpaRepository<Reading, Long> {
     List<Reading> findByMoisture(Double moisture);
 
     List<Reading> findByMoistureAndTimestampBetween(Double moisture, LocalDateTime start, LocalDateTime end);
+
+    Reading findTopByOrderByTimestampDesc();
 }
