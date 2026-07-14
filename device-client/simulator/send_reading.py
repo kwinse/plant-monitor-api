@@ -13,12 +13,15 @@ def send_reading():
     mock_moisture = random.uniform(0, 100)
     payload = {"moisture": mock_moisture}
     response = requests.post(url, json=payload, headers=headers)
-    print(f"Sent: {payload}")
-    print(f"Response: {response.status_code} - {response.text}")
+
+def get_reading():
+    response = requests.get(url + "/latest", headers=headers)
+    print(f"Latest: {response.status_code} - {response.text}")
     
 def tick():
     while True:
         send_reading()
+        get_reading()
         time.sleep(5)
     
 tick()
