@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Component
 public class ApiKeyFilter implements Filter {
@@ -21,7 +23,11 @@ public class ApiKeyFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
         String providedKey = httpRequest.getHeader("X-API-KEY");
-        if (providedKey == null || !providedKey.equals(validApiKey)) {
+        boolean valid = providedKey == null || MessageDigest.isEqual(
+                providedKey.getBytes(StandardCharsets.UTF_8),
+                validApiKey.getBytes(StandardCharsets.UTF_8)
+        );
+        if (!valid) {
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             httpResponse.getWriter().write("Invalid or missing API Key");
             return;
