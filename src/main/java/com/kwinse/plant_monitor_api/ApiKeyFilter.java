@@ -23,7 +23,7 @@ public class ApiKeyFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
         String providedKey = httpRequest.getHeader("X-API-KEY");
-        boolean valid = providedKey == null || MessageDigest.isEqual(
+        boolean valid = providedKey != null && MessageDigest.isEqual(
                 providedKey.getBytes(StandardCharsets.UTF_8),
                 validApiKey.getBytes(StandardCharsets.UTF_8)
         );
