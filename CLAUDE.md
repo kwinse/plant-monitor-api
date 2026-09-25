@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Plant monitor: ESP32 (C/C++) sensor nodes -> Spring Boot REST API -> MySQL. Portfolio project for a job search. Every design decision must be explainable by the owner in an interview. See README.md for run instructions, endpoints, and known gaps.
+Plant monitor: ESP32 (C/C++) sensor nodes -> Spring Boot REST API -> MySQL. Portfolio project for a job search. Every design decision must be explainable by the owner in an interview. See README.md for run instructions, endpoints, and known gaps, and docs/SPEC.md for goals, design decisions, and status.
 
 ## Working with the owner
 
@@ -32,4 +32,4 @@ The app is run only through Docker Compose. There is no IDE/local-JVM run path, 
 - Never read, print, or commit `.env` values.
 - Any security-relevant change (auth, validation) gets a test that fails without the change. Verify that by temporarily reverting the change.
 - Spring Boot 4.x: test annotations live in the new packages (e.g. `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`), and mocks use `@MockitoBean`, not `@MockBean`.
-- After a real milestone or a reversed decision, remind the owner to update the project spec (Decisions + Status sections). The spec currently lives outside the repo.
+- The project spec is `docs/SPEC.md`. After a real milestone or a reversed decision, update its Status (Section 9) and add a Decisions row (Section 5) in the same format. Ask the owner for their reasoning rather than inventing it.
