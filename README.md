@@ -102,15 +102,14 @@ Every endpoint requires an `X-API-KEY` header. A missing or wrong key returns `4
 ## Tests
 
 ```bash
-./mvnw test -Dtest=ApiKeyFilterTests
+./mvnw test
 ```
-`ApiKeyFilterTests` checks that missing, wrong, and correct API keys are handled correctly. It runs without a database.
+Docker must be running. `PlantMonitorApiApplicationTests` uses [Testcontainers](https://testcontainers.com/) to start a throwaway MySQL 8 container, so tests run against the same database engine as production. `ApiKeyFilterTests` checks missing, wrong, and correct API keys without a database.
 
-The generated `PlantMonitorApiApplicationTests` needs a live database and currently fails under a plain `./mvnw test`. See known gaps.
+GitHub Actions runs the full suite on every push and pull request to `main` (`.github/workflows/ci.yml`).
 
 ## Known gaps
 
-- `PlantMonitorApiApplicationTests` fails without a database, so `./mvnw test` is not green yet.
 - The ESP32 doesn't send data to the API yet.
 - Readings aren't tied to a plant or device yet. Everything is one stream.
 - The API uses plain HTTP with one shared key. That's acceptable on a home LAN, but it must change before any public deployment.

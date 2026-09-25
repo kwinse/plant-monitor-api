@@ -16,7 +16,7 @@ When the owner could plausibly find a bug themselves, point at the location and 
 - Start stack: `docker compose up -d --build` (needs `.env`, see README)
 - Dev loop: `docker compose watch` (rebuilds the API on changes to `src/`)
 - Logs: `docker compose logs -f backend`
-- Tests that run without a DB: `./mvnw test -Dtest=ApiKeyFilterTests`
+- Tests: `./mvnw test` (needs Docker running; Testcontainers starts MySQL). CI runs the same on push/PR.
 - Simulator: `python device-client/simulator/send_reading.py`
 
 The app is run only through Docker Compose. There is no IDE/local-JVM run path, which is deliberate so there's only one way to run things. `application.properties` intentionally has no datasource URL; Compose injects it through `SPRING_DATASOURCE_*` env vars. MySQL is on host port **3307**, not 3306.
