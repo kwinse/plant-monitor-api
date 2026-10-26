@@ -35,7 +35,7 @@ public class Reading {
         this.moisture = moisture;
     }
 
-    @JsonFormat(pattern = "MM-dd-YYYY HH:mm:ss")
+    @JsonFormat(pattern = "MM-dd-yyyy HH:mm:ss")
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
