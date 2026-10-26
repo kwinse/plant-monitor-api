@@ -25,8 +25,8 @@ The scope grew naturally instead of being padded: firmware needed a backend to s
 
 ### In scope (v1)
 
-- 2x ESP32 nodes: one board running 2 sensor sets (moisture + light) for 2 plants sharing a power rail, one board running 1 sensor set + local screen on its own power rail.
-- C/C++ firmware: reads sensors, renders a Tamagotchi-style mood on the local screen, sends readings over WiFi/HTTP.
+- One ESP32 node per plant, each with 1 moisture + 1 light sensor, no screen (changed 2026-10-25, see Section 5).
+- C/C++ firmware: reads sensors, sends raw readings over WiFi/HTTP. The Tamagotchi-style mood moves to the dashboard for now.
 - Java Spring Boot backend: REST API, MySQL storage.
 - JS frontend dashboard: shows current + historical state per plant, pulled from the Spring Boot API.
 - Python analytics layer: pulls historical data, checks whether initial thresholds/sensor placement were actually correct, light trend prediction.
@@ -50,10 +50,13 @@ Four layers, each justified above rather than padding for resume length:
 
 ## 4. Hardware Layout
 
-- ESP32 #1: 2x moisture sensor, 2x light sensor, serving 2 nearby plants. 1 shared screen, decision pending. Shared breadboard power rail.
-- ESP32 #2: 1x moisture sensor, 1x light sensor, 1x screen. Standalone. Separate power rail, same breadboard.
-- No battery required for either node. Both stay plugged into wall power since the portable/traveling use case is parked.
-- Parts for a 3rd setup exist but are unused, kept as spare/future stock.
+- One node per plant (3x ELEGOO 38-pin ESP32 on hand). Same wiring on every node, no breadboard needed:
+  - Capacitive soil sensor: VCC → 3V3, GND → GND, AOUT → D34 (ADC1, works with WiFi on).
+  - BH1750 light sensor: VCC → D25 (GPIO set HIGH in code, since the board has only one 3V3 pin; D4 did not power it), GND → second GND, SDA → D21, SCL → D22, ADDR unconnected (0x23).
+- Node 1 built 2026-10-25. Moisture calibration (sensor on 3V3): ~2900 in air, ~900 in water.
+- BH1750 header is taped, not soldered. Holds when untouched; twisting or pressing causes failed reads. Solder when an iron is available.
+- USB wall power. Battery parked: the TP4056 module is charge-only (outputs raw 3.7–4.2V), so a battery would also need a ≥500mA low-dropout 3.3V regulator, deep-sleep firmware, and the dev board's power LED disabled to last more than ~1–2 weeks.
+- The 38-pin board is too wide for a single breadboard (no free holes beside its pins); a desk test setup needs two breadboards side by side.
 
 ## 5. Key Design Decisions
 
@@ -68,6 +71,10 @@ Format: the realistic alternative first (why someone would reasonably pick it), 
 | MySQL over PostgreSQL | PostgreSQL: richer feature set (JSONB, extensions, stricter SQL standards compliance), popular default for new projects, and what this project originally ran on. | Nothing technical breaks down: at this workload (a few readings per minute) both are far more than enough. The deciding factor is the target job market: Java/Spring Boot listings pair with MySQL often, and this project exists to produce evidence for those listings. Switching was cheap (JPA abstracts most SQL). | Gives up Postgres-only features that could help later (e.g. JSONB for flexible sensor payloads). If the analytics layer needs advanced SQL, Postgres would have been the stronger fit. This is a career-driven choice, not a technical one, and it's stated as such. |
 | Docker Compose as the only way to run the backend | Run Spring Boot from the IDE against a Dockerized DB: native breakpoints, faster restarts. | Two run paths means two sets of config (ports, credentials) that drift apart. After months away, the IDE path failed (wrong port, no credentials) while Compose still worked. One path means one thing to remember. | No IDE breakpoints by default, and `docker compose watch` rebuilds take ~30s versus a near-instant IDE restart. |
 | Testcontainers over H2 for integration tests | H2 in-memory DB: no Docker needed, faster startup, zero setup. | H2 is a different database engine from MySQL. SQL dialect, types, and constraint behavior differ, so tests can pass on H2 and fail in production. The project already migrated away from H2 once. | Tests require Docker running, and the first run is slower (~15s to start MySQL). CI runners provide Docker, so this only costs local convenience. |
+| One ESP32 node per plant (2026-10-25) | 2+1 split: one ESP32 serving 2 plants on a shared power rail, plus one standalone node. Fewer boards. | "Keep it simple and make it work first." The shared node meant more wiring on one board, an open shared-screen question, and wires running to two pots. One node per plant is the same wiring built once and repeated. | Uses all 3 ESP32s with no spare, and every plant needs its own USB power near the pot. |
+| No screen on plant nodes (2026-10-25) | Keep the Tamagotchi OLED on each node, which is the original reason the device is "legible and interesting" (Section 1). | "I don't really need the screen working, I need data over time." The screen added wiring and power draw without adding anything to the dataset the analytics layer depends on. | The at-a-glance mood on the device is gone for now and moves to the dashboard. The project loses some of its on-device personality until a screen comes back. |
+| Send all useful fields: deviceId, moistureRaw, light, rssi (2026-10-25) | Send only moisture, which the backend already accepted. | "Easier to send as much data as possible and configure the backend to take what we need." Moisture-only would mix every plant into one stream once a 2nd node exists, and throw away light and WiFi signal data. | The backend needs a column for every field. Spring silently ignores JSON fields the entity doesn't have, so "send everything" only helps if the schema keeps up. |
+| Convert raw moisture to % once, in the backend (2026-10-25) | Convert on the ESP32 before sending, or have each consumer (dashboard, analytics) convert raw itself. | Convert once in the backend, and the frontend and database can just consume it without worrying. If the backend doesn't convert, you have to worry about it everywhere it gets converted. Converting on the ESP32 would also mean re-flashing each node to re-calibrate. | More backend work: a calibration per device and the conversion code, and validation checks the raw range (0–4095) instead of 0–100. |
 | AWS (EC2 + RDS) timed to nPower AWS Cloud Practitioner course schedule | Deploy immediately on whatever's fastest (Heroku, Render, local Docker) and skip AWS until the course requires it. | Cloud concepts (EC2, RDS, storage) are being taught in the nPower course concurrently. Deploying to AWS now means every concept gets applied hands-on on a real project as it's taught, instead of being labbed in isolation and forgotten before it's used for real. | AWS free tier has real limits and EC2/RDS setup has more moving parts (VPC, security groups, IAM) than a one-click host. Slower to get a first deploy working, but that friction is exactly what the course is teaching. **Update 2026-09-25:** accounts created after July 15, 2025 get credits and a free plan that ends at 6 months or when credits run out, so AWS is a learning/demo deployment, not a permanent free host. Always-on hosting stays on a local machine for now. |
 
 ## 6. Data Flow
@@ -90,6 +97,7 @@ Format: the realistic alternative first (why someone would reasonably pick it), 
 
 - Shared power rail on ESP32 #1 (2 sensor sets): a voltage sag or short from one sensor set can corrupt or destabilize readings from the other. Isolate wiring per sensor set even though they share the rail.
 - WiFi dropout: if the home network blips, readings stop reaching the backend until reconnect. Firmware should handle this gracefully (retry/backoff) rather than crash or hang.
+- Loose or taped sensor connections: the BH1750 returns failed reads when its taped header is twisted or pressed. Firmware should retry and send `light: null` instead of a fake value, so bad contact never poisons the dataset. Real fix: solder the header.
 - Miscalibrated thresholds: this is explicitly why analytics (Layer 4) exists. Wrong thresholds silently produce a wrong mood/status for weeks unless something checks the assumption against reality.
 - AWS free tier limits: RDS/EC2 free tier caps could be hit if left running carelessly or misconfigured. Monitor usage (set an AWS Budgets alert), don't treat free tier as unlimited.
 - Host machine asleep or rebooted: containers restart automatically (`restart: unless-stopped`) only if Docker Desktop itself starts on login. If the PC is asleep, nothing is listening and readings are lost.
@@ -100,8 +108,9 @@ No hard deadline. Progress is tracked as GitHub Issues with estimates vs actuals
 
 - **Done:** hardware layout finalized (2+1 split, power rail plan, screen placement except the shared-screen question on ESP32 #1).
 - **Done:** Spring Boot API + MySQL running via Docker Compose with auto-restart; API key auth with regression tests; Testcontainers integration test; GitHub Actions CI; README.
-- **In progress:** ESP32 firmware. `sensor_test.ino` reads 2 moisture + 2 light sensors and shows mood on the OLED. Next: send readings over WiFi to the API.
-- **Next:** Plant/Device data model (readings are currently one unkeyed stream), then Python ETL/analytics, then dashboard, then AWS deploy.
+- **Done (2026-10-25):** Node 1 wired (moisture + light, no screen) and verified with `sensor_check.ino` (0 failed light reads when untouched) and `i2c_scanner.ino`. Moisture calibrated (~2900 air, ~900 water).
+- **In progress:** Backend accepts the new payload (deviceId, moistureRaw, light, rssi) with a per-device calibration table that converts raw to %.
+- **Next:** Firmware sends readings over WiFi every minute while testing (15 min once stable), with secrets in a git-ignored `secrets.h`. Then Python ETL/analytics, then dashboard, then AWS deploy.
 - Paced against the nPower course for the AWS layer specifically.
 
 ## 10. Future Enhancements (Parked, Not Forgotten)
