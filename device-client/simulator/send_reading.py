@@ -10,9 +10,16 @@ if api_key is None:
 headers = {"X-API-KEY": api_key}
 
 def send_reading():
-    mock_moisture = random.uniform(0, 100)
-    payload = {"moisture": mock_moisture}
+    # Same shape the ESP32 sends. Raw range is node 1's calibration (900 wet, 2900 dry).
+    payload = {
+        "deviceId": 1,
+        "moistureRaw": random.randint(900, 2900),
+        "light": round(random.uniform(0, 1000), 1),
+        "rssi": random.randint(-80, -40),
+    }
     response = requests.post(url, json=payload, headers=headers)
+    if response.status_code != 200:
+        print(f"Rejected: {response.status_code} - {response.text}")
 
 def get_reading():
     response = requests.get(url + "/latest", headers=headers)
