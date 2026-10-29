@@ -69,13 +69,15 @@ Both containers use `restart: unless-stopped`, so they come back after a crash o
 pip install requests python-dotenv
 python device-client/simulator/send_reading.py
 ```
-Posts a random moisture value every 5 seconds and prints the latest reading. It reads `API_KEY` from the root `.env`.
+Posts a random raw reading as device `1` every 5 seconds and prints the latest reading. It reads `API_KEY` from the root `.env`. Device 1 must be registered first (see below).
 
-### Quick manual check
+### First-time setup: register a device and a plant
 ```bash
-curl -X POST localhost:8080/api/readings \
-  -H "X-API-KEY: <your key>" -H "Content-Type: application/json" \
-  -d '{"moisture": 42.5}'
+post() { curl -X POST "localhost:8080$1" -H "X-API-KEY: <your key>" -H "Content-Type: application/json" -d "$2"; echo; }
+post /api/devices     '{"label": "NODE-01", "dryRaw": 2900, "wetRaw": 900}'
+post /api/plants      '{"name": "Pink Princess", "species": "Philodendron erubescens"}'
+post /api/assignments '{"deviceId": 1, "plantId": 1}'
+post /api/readings    '{"deviceId": 1, "moistureRaw": 1900, "light": 120.5, "rssi": -60}'
 ```
 
 ## API
@@ -84,7 +86,13 @@ Every endpoint requires an `X-API-KEY` header. A missing or wrong key returns `4
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/api/readings` | Body `{"moisture": 0-100}`. Server sets the timestamp. `400` if missing or out of range. |
+| `POST` | `/api/readings` | Body `{"deviceId", "moistureRaw": 0-4095, "light": 0-65535 or null, "rssi": -120-0 or null}`. Server converts raw to moisture % using the device's calibration, stamps the plant the device is currently assigned to (`null` if unassigned), and sets the timestamp. `400` if a field is missing, out of range, or the device is unknown. |
+| `POST` | `/api/devices` | Body `{"label", "dryRaw", "wetRaw"}`. Raw values 0-4095, `dryRaw > wetRaw`. `409` if the label exists. |
+| `GET` | `/api/devices` | All devices |
+| `POST` | `/api/plants` | Body `{"name", "species"?, "dateAcquired"?, "targetMoistureMin"?, "targetMoistureMax"?}`. Targets 0-100, min ≤ max. |
+| `GET` | `/api/plants` | All plants |
+| `POST` | `/api/assignments` | Body `{"deviceId", "plantId"}`. Moves the device: ends its current assignment and starts a new one, in one transaction. `409` if already on that plant. |
+| `GET` | `/api/assignments` | Assignment history |
 | `GET` | `/api/readings/all` | All readings |
 | `GET` | `/api/readings/latest` | Most recent reading, `204` if none |
 | `GET` | `/api/readings/{id}` | One reading |
@@ -104,14 +112,13 @@ Every endpoint requires an `X-API-KEY` header. A missing or wrong key returns `4
 ```bash
 ./mvnw test
 ```
-Docker must be running. `PlantMonitorApiApplicationTests` uses [Testcontainers](https://testcontainers.com/) to start a throwaway MySQL 8 container, so tests run against the same database engine as production. `ApiKeyFilterTests` checks missing, wrong, and correct API keys without a database.
+Docker must be running. `PlantMonitorApiApplicationTests` uses [Testcontainers](https://testcontainers.com/) to start a throwaway MySQL 8 container, so tests run against the same database engine as production; it also runs one full device → plant → assignment → reading flow. `ApiKeyFilterTests` checks missing, wrong, and correct API keys. `ReadingValidationTests`, `DeviceControllerTests`, `PlantControllerTests`, and `DeviceAssignmentControllerTests` cover each field's missing / out-of-range / boundary cases with mocked repositories. `DeviceTests` covers the raw-to-% conversion.
 
 GitHub Actions runs the full suite on every push and pull request to `main` (`.github/workflows/ci.yml`).
 
 ## Known gaps
 
 - The ESP32 doesn't send data to the API yet.
-- Readings aren't tied to a plant or device yet. Everything is one stream.
+- If a device is moved without recording a new assignment, its readings are charted on the old plant. The system can't detect a move on its own.
 - The API uses plain HTTP with one shared key. That's acceptable on a home LAN, but it must change before any public deployment.
 - `GET /api/readings/{id}` returns `500` instead of `404` for an unknown id.
-- Timestamp format uses `YYYY` (week-based year) instead of `yyyy`.

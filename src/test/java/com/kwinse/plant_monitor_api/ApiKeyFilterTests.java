@@ -20,6 +20,12 @@ class ApiKeyFilterTests {
     @MockitoBean
     private ReadingRepository readingRepository;
 
+    @MockitoBean
+    private DeviceRepository deviceRepository;
+
+    @MockitoBean
+    private DeviceAssignmentRepository assignmentRepository;
+
     @Test
     void missingKeyIsRejected() throws Exception {
         mockMvc.perform(get("/api/readings/all"))
