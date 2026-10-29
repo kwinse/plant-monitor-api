@@ -2,14 +2,16 @@
 
 Plant monitor: ESP32 (C/C++) sensor nodes -> Spring Boot REST API -> MySQL. Portfolio project for a job search. Every design decision must be explainable by the owner in an interview. See README.md for run instructions, endpoints, and known gaps, and docs/SPEC.md for goals, design decisions, and status.
 
-## Working with the owner
+## Quality bar
 
-The owner is a junior dev who is building real understanding while moving fast. Pace work in three tiers:
-1. **Trivial** (conditionals, loops, renames, obvious fixes): just do it.
-2. **Unfamiliar patterns** (Spring annotations, JPA, Docker, Arduino libs): do it, then briefly explain what each non-obvious piece does and why it exists.
-3. **Decisions and trade-offs** (schema, auth, hosting, libraries, error-handling strategy): stop before coding. Present options with honest costs, ask for the owner's pick and reasoning first, then recommend. Build only after agreement.
+Company-grade, not "make it work." Before adding any field, column, or endpoint, answer:
+- **Who sets it:** client or server? Clients never set ids, timestamps, or computed values (request records, not entities, as `@RequestBody`).
+- **What's valid:** missing, wrong type, out of range, boundary, weird-but-real.
+- **Null:** can it be null, and what does null mean?
+- **When it's wrong:** what breaks, and who finds out? Errors are loud: the right status code (400 client input, 401 auth, 404 missing resource, 409 state conflict, 500 our bug), logged with context, never swallowed in a catch.
+- **Who else reads or writes it:** search references; don't rely on memory.
 
-When the owner could plausibly find a bug themselves, point at the location and ask before revealing the answer.
+Show the failure for real (remove the check, run it) before calling it fixed.
 
 ## Commands
 
@@ -23,7 +25,7 @@ The app is run only through Docker Compose. There is no IDE/local-JVM run path, 
 
 ## Code layout
 
-- `src/main/java/com/kwinse/plant_monitor_api/`: flat package. `ApiKeyFilter` (servlet filter, constant-time key compare), `Reading` (JPA entity), `ReadingRepository` (Spring Data derived queries), `ReadingController`.
+- `src/main/java/com/kwinse/plant_monitor_api/`: flat package. `ApiKeyFilter` (servlet filter, constant-time key compare). Entities `Device` (calibration), `Plant`, `DeviceAssignment` (which plant a device is in, and when), `Reading`, each with a Spring Data repository and a controller. `*Request` records define what clients may send.
 - `device-client/esp32-firmware/`: Arduino sketches (C/C++). MicroPython was dropped on purpose; don't reintroduce it.
 - `device-client/simulator/`: Python fake device.
 
